@@ -1,0 +1,10 @@
+/* Warehouse Credits over time */
+SELECT
+warehouse_name,
+:datebucket(start_time)  usage_bucket
+,ROUND(SUM(credits_used_compute),0) AS "Compute Credits Used"
+,ROUND(SUM(credits_used_cloud_services),0) "Cloud Services Credits Used"
+FROM snowflake.account_usage.warehouse_metering_history
+WHERE  start_time = :daterange
+GROUP BY 1,2
+ORDER BY 1;
