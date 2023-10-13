@@ -1,0 +1,19 @@
+/* Cluster % by Warehouse: */
+with cte_agg as (SELECT
+//:datebucket( start_time ) as query_bucket,
+warehouse_name,
+cluster_number,
+MAX(cluster_number) AS max_cluster_count, AVG(cluster_number) AS avg_cluster_count,
+MEDIAN(cluster_number) AS median_cluster_count,
+count(*) AS  query_count
+FROM snowflake.account_usage.query_history q
+WHERE start_time = :daterange
+GROUP BY 1, 2 //,2
+ORDER BY 1 )
+select cluster.warehouse_name,
+       cluster.cluster_number,
+       round(100* ratio_to_report(cte_agg.query_count) over (partition by cluster.warehouse_name), 2) pct
+       from (select warehouse_name, row_number() over (partition by warehouse_name order by 1) -1 cluster_number from table(generator(rowcount => 11)) cross join (select distinct warehouse_name from cte_agg) ) cluster
+       left join cte_agg 
+        on cte_agg.warehouse_name = cluster.warehouse_name
+        and cluster.cluster_number = coalesce(cte_agg.cluster_number, 0)
