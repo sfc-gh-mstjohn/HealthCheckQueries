@@ -1,0 +1,14 @@
+/* P95 Query Performance by Warehouse:*/
+SELECT warehouse_name,
+//:datebucket(end_time) query_end_date,
+COUNT(*) queries,
+ROUND(AVG(total_elapsed_time/1000),2) as avg_query_time
+,ROUND(MEDIAN(total_elapsed_time/1000),2) as median_query_time
+,ROUND(APPROX_PERCENTILE(total_elapsed_time,0.95)/1000 ,0) as "P95 Query Time"
+,ROUND(APPROX_PERCENTILE(execution_time,0.95)/1000 ,0) as "P95 Execution Time"
+,ROUND(APPROX_PERCENTILE(compilation_time,0.95)/1000 ,0) as "P95 Compilation Time"
+,ROUND(APPROX_PERCENTILE(queued_overload_time,0.95)/1000 ,0) as "P95 Queued Time"
+FROM SNOWFLAKE.account_usage.query_history
+WHERE start_time = :daterange
+GROUP BY 1 //,2
+ORDER BY 1,2 //, 3;
