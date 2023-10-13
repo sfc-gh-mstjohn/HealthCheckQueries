@@ -1,0 +1,39 @@
+   /* ReSize History: */
+WITH wh_resize_history AS(
+SELECT eh.warehouse_name, eh.timestamp,
+qh.query_text
+,REPLACE(UPPER(query_text),'''','') AS query_text_nq,
+REPLACE(UPPER(query_text_nq), ' ','') AS query_text_cleansed1,
+POSITION('SIZE=',query_text_cleansed1) + 5 AS wh_to_size_start_pos,
+POSITION(';',query_text_cleansed1) AS qtc_semicolon,
+CASE WHEN qtc_semicolon = 0 THEN query_text_cleansed1 || ' ' ELSE query_text_cleansed1 END AS query_text_cleansed,
+LENGTH(query_text_cleansed) AS query_text_cleansed_length,
+GREATEST(qtc_semicolon, query_text_cleansed_length) AS wh_to_size_very_end_pos,
+POSITION('AUTO_SUSPEND',query_text_cleansed) AS as_pos,
+CASE WHEN as_pos = 0 THEN 1000 ELSE as_pos END AS wh_to_size_end_pos,
+LEAST(wh_to_size_end_pos,wh_to_size_very_end_pos ) AS end_pos,
+SUBSTRING(query_text_cleansed, wh_to_size_start_pos, end_pos - wh_to_size_start_pos) AS wh_size,
+eh.user_name, eh.role_name
+FROM SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_EVENTS_HISTORY AS eh
+INNER JOIN SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY AS qh on qh.query_id = eh.query_id
+WHERE eh.timestamp  = :daterange
+AND qh.start_time  = :daterange
+AND eh.event_name = 'RESIZE_WAREHOUSE'
+AND eh.event_state = 'COMPLETED'
+)
+SELECT TO_CHAR(DATE_TRUNC('MINUTE', timestamp)::timestamp_ntz) AS "Resize Timestamp",
+INITCAP(wh_size) AS "Resized To",
+wh_to_size_start_pos, wh_to_size_end_pos, end_pos, wh_to_size_very_end_pos, query_text_cleansed_length,
+CASE WHEN wh_size IN('XSMALL', 'X-SMALL') THEN 1
+WHEN wh_size = 'SMALL' THEN 2
+WHEN wh_size = 'MEDIUM' THEN 4
+WHEN wh_size = 'LARGE' THEN 8
+WHEN wh_size IN('XLARGE', 'X-LARGE') THEN 16
+WHEN wh_size IN('X2LARGE','XXLARGE','2X-LARGE') THEN 32
+WHEN wh_size IN('X3LARGE','XXXLARGE','3X-LARGE') THEN 64
+WHEN wh_size IN('X4LARGE' ,'XXXXLARGE','4X-LARGE')THEN 128
+ELSE 0 END AS wh_size_num,
+query_text, query_text_cleansed,
+user_name AS "Username"
+FROM wh_resize_history
+ORDER BY timestamp DESC
