@@ -1,0 +1,11 @@
+/* Warehouse Load history:*/
+ SELECT
+warehouse_name,
+start_time,
+warehouse_name,
+ROUND(avg_running,1) AS "AVG Running",
+ROUND(avg_queued_load,1) AS "AVG Queued Load",
+ROUND(avg_blocked,1) AS "AVG Blocked"
+FROM snowflake.account_usage.warehouse_load_history
+WHERE start_time = :daterange
+ORDER BY start_time;
