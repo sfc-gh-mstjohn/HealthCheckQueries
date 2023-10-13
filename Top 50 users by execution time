@@ -1,0 +1,11 @@
+/* Top 50 Users by Execution Time: */
+SELECT
+user_name,
+warehouse_name,
+ROUND(SUM(execution_time)/(1000*60*60),1) exec_hrs,
+COUNT(1) AS num_queries
+FROM snowflake.account_usage.query_history
+WHERE start_time = :daterange
+GROUP BY 1,2
+ORDER BY exec_hrs DESC
+LIMIT 50;
