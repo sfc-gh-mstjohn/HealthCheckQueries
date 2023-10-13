@@ -1,0 +1,54 @@
+/* Under Utilized Warehouses:*/
+with cte_qh as
+(
+     select dateadd(seconds, (queued_overload_time / 1000), start_time)  as usage_at,             
+            row_number() over(partition by warehouse_name order by usage_at) as
+start_ordinal
+, +1 as type
+,           q.*
+       from snowflake.account_usage.query_history q
+     where
+start_time::date between date_trunc('day', dateadd('day', -30, current_timestamp()))::date
+and date_trunc('day', current_timestamp())::date
+     and query_type in ('COPY', 'INSERT', 'MERGE', 'UNLOAD', 'RECLUSTER','SELECT','DELETE', 'CREATE_TABLE_AS_SELECT', 'UPDATE')
+     and  cluster_number is not null
+     and warehouse_name is not null
+     and warehouse_name not like  '%COMPUTE_SERVICE%'
+     union all
+select end_time  as usage_at,             
+            null as start_ordinal
+, -1 as type
+,            q.*
+       from snowflake.account_usage.query_history q
+    where
+start_time::date between date_trunc('day', dateadd('day', -30, current_timestamp()))::date
+and date_trunc('day', current_timestamp())::date
+     and query_type in ('COPY', 'INSERT', 'MERGE', 'UNLOAD', 'RECLUSTER','SELECT','DELETE', 'CREATE_TABLE_AS_SELECT', 'UPDATE')
+     and  cluster_number is not null
+     and warehouse_name is not null
+     and warehouse_name not like  '%COMPUTE_SERVICE%'
+), cte_concurrency_prep as (
+     select 
+row_number() over(partition by warehouse_name order by usage_at, type) as start_or_end_ordinal,
+     *
+from cte_qh )
+,credits_30_days as (select warehouse_name, sum(credits_used) as credits_used_30_days
+                     from snowflake.account_usage.warehouse_metering_history
+                     where date_trunc('day' ,start_time) between  dateadd(days, -30, current_date()) and current_date()
+group by 1)
+select distinct  warehouse_name, credits_used_30_days,avg_highwater_mark_of_concurrency_per_minute,
+highwater_mark_of_concurrency,
+'Warehouse ' || warehouse_name || ' has concurrency highwater mark of AVG: ' || avg_highwater_mark_of_concurrency_per_minute || ' MAX: ' || highwater_mark_of_concurrency || ' and consumed ' || credits_used_30_days || ' credits in the last 30 days and is potentially underutilized' finding
+from (
+select  j.warehouse_name, credits_used_30_days,
+date_trunc(minute, usage_at) as usage_minute,
+max(max(2 * start_ordinal - start_or_end_ordinal)) over(partition by j.warehouse_name) as highwater_mark_of_concurrency,
+avg(max(2 * start_ordinal - start_or_end_ordinal)) over(partition by j.warehouse_name) as avg_highwater_mark_of_concurrency_per_minute
+from cte_concurrency_prep j
+left join credits_30_days c
+  on j.warehouse_name = c.warehouse_name 
+    where type = 1
+group by 1,2, 3
+qualify avg_highwater_mark_of_concurrency_per_minute < 5
+    )
+order by credits_used_30_days desc, 1,2 ;
