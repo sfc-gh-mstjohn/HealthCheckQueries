@@ -1,0 +1,14 @@
+/* Median Query Performance by WH:*/
+SELECT warehouse_name,
+//:datebucket(end_time) query_end_date,
+COUNT(*) queries, ROUND(AVG(total_elapsed_time/1000),2) as avg_query_time
+,ROUND(MEDIAN(total_elapsed_time/1000),2) as "Median Query Time"
+, ROUND(AVG(execution_time/1000),2) as avg_execution_time
+, ROUND(MEDIAN(execution_time/1000),2) as "Median Execution Time"
+, ROUND(MEDIAN(compilation_time/1000),2) as "Median Compilation Time"
+, ROUND(MEDIAN(queued_overload_time/1000),2) as "Median Queued Time"
+FROM SNOWFLAKE.account_usage.query_history
+WHERE start_time = :daterange
+GROUP BY 1 //,2
+ORDER BY 1,2 //, 3;
+
