@@ -1,0 +1,12 @@
+/* Blocked Transactions by Warehouse:*/
+SELECT warehouse_name,
+:datebucket(start_time) as start_time,
+query_type,
+AVG(transaction_blocked_time) / 1000 AS avg_txn_blocked_time, -- seconds
+MEDIAN(transaction_blocked_time) / 1000 AS median_txn_blocked_time, -- seconds
+count(*) AS hourly_query_count
+FROM snowflake.account_usage.query_history q
+WHERE start_time = :daterange
+AND transaction_blocked_time > 0
+GROUP BY 1,2, 3
+ORDER BY 1;
