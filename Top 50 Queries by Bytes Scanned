@@ -1,0 +1,28 @@
+/*Top 50 Queries Bytes Scanned: */
+ SELECT
+query_text,
+warehouse_name,
+query_type,
+database_name,
+user_name,
+ROUND(AVG(bytes_spilled_to_remote_storage) / power(1024,3),4) AS avg_gb_spilled_to_remote_storage,
+ROUND(SUM(bytes_spilled_to_remote_storage) / power(1024,3),0) AS total_gb_spilled_to_remote_storage,
+ROUND(AVG(bytes_spilled_to_local_storage) / power(1024,3),4) AS avg_gb_spilled_to_local_storage,
+ROUND(SUM(bytes_spilled_to_local_storage) / power(1024,3),0) AS total_gb_spilled_to_local_storage,
+COUNT(*) AS query_count,
+--ROUND(AVG(total_elapsed_time)/(1000*60),0) avg_elapsed_min,
+ROUND(AVG(execution_time)/(1000*60),0) AS avg_exec_min,
+ROUND(SUM(execution_time)/(1000*60),0) AS total_exec_minutes,
+ROUND(AVG((partitions_scanned / NULLIF(partitions_total,0))),2) * 100 AS avg_partition_scan_ratio,
+ROUND(AVG(partitions_scanned),0) AS avg_partitions_scanned,
+ROUND(AVG(partitions_total),0) AS avg_partitions_total,
+ROUND(AVG(BYTES_SCANNED) / POWER(2, 30), 0) AS avg_GB_scanned,
+TO_CHAR(MIN(start_time),'YYYY-MM-DD hh24:mi') AS earliest_start_time,
+TO_CHAR(MAX(start_time),'YYYY-MM-DD hh24:mi') AS latest_start_time,
+MAX(query_id) latest_query_id
+FROM snowflake.account_usage.query_history
+WHERE start_time = :daterange
+GROUP BY 1,2,3,4,5
+ORDER BY avg_GB_scanned DESC
+LIMIT 50
+;
